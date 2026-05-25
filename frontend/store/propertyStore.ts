@@ -6,74 +6,33 @@ import toast from 'react-hot-toast';
 
 interface PropertyState {
   properties: Property[];
-  currentProperty: Property | null;
-  similarProperties: Property[];
   favorites: Property[];
   isLoading: boolean;
-  pagination: PaginatedResponse<any>['pagination'] | null;
-  filters: PropertyFilters;
-  fetchProperties: (filters?: PropertyFilters) => Promise<void>;
-  fetchProperty: (id: string) => Promise<void>;
-  fetchSimilarProperties: (id: string) => Promise<void>;
-  createProperty: (data: FormData) => Promise<void>;
-  updateProperty: (id: string, data: any) => Promise<void>;
-  deleteProperty: (id: string) => Promise<void>;
-  toggleFavorite: (propertyId: string) => Promise<void>;
+  totalPages: number;
+  currentPage: number;
+  
+  fetchProperties: (page?: number, filters?: any) => Promise<void>;
   fetchFavorites: () => Promise<void>;
-  setFilters: (filters: Partial<PropertyFilters>) => void;
-  clearFilters: () => void;
-}
-
-interface PropertyFilters {
-  search?: string;
-  city?: string;
-  propertyType?: string;
-  listingType?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  bedrooms?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  page?: number;
-  limit?: number;
+  toggleFavorite: (propertyId: string) => Promise<void>;
+  searchProperties: (query: string) => Promise<void>;
 }
 
 export const usePropertyStore = create<PropertyState>((set, get) => ({
   properties: [],
-  currentProperty: null,
-  similarProperties: [],
   favorites: [],
   isLoading: false,
-  pagination: null,
-  filters: {
-    page: 1,
-    limit: 12,
-    sortBy: 'createdAt',
-    sortOrder: 'desc',
-  },
+  totalPages: 1,
+  currentPage: 1,
 
-  fetchProperties: async (filters = {}) => {
+  fetchProperties: async (page = 1, filters = {}) => {
     set({ isLoading: true });
     try {
-      const currentFilters = { ...get().filters, ...filters };
-      const queryParams = new URLSearchParams(
-        Object.entries(currentFilters).reduce((acc, [key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            acc[key] = String(value);
-          }
-          return acc;
-        }, {} as Record<string, string>)
-      );
-      
-      const response = await apiService.get<PaginatedResponse<Property>>(
-        `/properties?${queryParams.toString()}`
-      );
-      
-      set({
-        properties: response.data.properties,
-        pagination: response.data.pagination,
-        filters: currentFilters,
-        isLoading: false,
+      const response = await apiService.get<PaginatedResponse<Property>>(`/properties?page=${page}`, filters);
+      set({ 
+        properties: response.data, 
+        totalPages: response.totalPages,
+        currentPage: response.page,
+        isLoading: false 
       });
     } catch (error) {
       set({ isLoading: false });
@@ -81,104 +40,42 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
     }
   },
 
-  fetchProperty: async (id: string) => {
+  fetchFavorites: async () => {
     set({ isLoading: true });
     try {
-      const response = await apiService.get(`/properties/${id}`);
-      set({ currentProperty: response.data.data, isLoading: false });
+      const response = await apiService.get<Property[]>('/favorites');
+      set({ favorites: response, isLoading: false });
     } catch (error) {
       set({ isLoading: false });
-      toast.error('Failed to fetch property details');
-    }
-  },
-
-  fetchSimilarProperties: async (id: string) => {
-    try {
-      const response = await apiService.get(`/properties/${id}/similar`);
-      set({ similarProperties: response.data.data });
-    } catch (error) {
-      console.error('Failed to fetch similar properties:', error);
-    }
-  },
-
-  createProperty: async (data: FormData) => {
-    set({ isLoading: true });
-    try {
-      const response = await apiService.uploadMultiple('/properties', 
-        Array.from(data.getAll('images')) as File[], 
-        'images'
-      );
-      toast.success('Property created successfully!');
-      set({ isLoading: false });
-      return response.data;
-    } catch (error) {
-      set({ isLoading: false });
-      toast.error('Failed to create property');
-      throw error;
-    }
-  },
-
-  updateProperty: async (id: string, data: any) => {
-    set({ isLoading: true });
-    try {
-      await apiService.put(`/properties/${id}`, data);
-      toast.success('Property updated successfully!');
-      set({ isLoading: false });
-      get().fetchProperty(id);
-    } catch (error) {
-      set({ isLoading: false });
-      toast.error('Failed to update property');
-    }
-  },
-
-  deleteProperty: async (id: string) => {
-    set({ isLoading: true });
-    try {
-      await apiService.delete(`/properties/${id}`);
-      toast.success('Property deleted successfully!');
-      set({ isLoading: false });
-      get().fetchProperties();
-    } catch (error) {
-      set({ isLoading: false });
-      toast.error('Failed to delete property');
+      toast.error('Failed to fetch favorites');
     }
   },
 
   toggleFavorite: async (propertyId: string) => {
     try {
-      await apiService.post(`/properties/${propertyId}/favorite`);
-      get().fetchFavorites();
-      toast.success('Favorite status updated');
+      const isFavorite = get().favorites.some(fav => fav.id === propertyId);
+      if (isFavorite) {
+        await apiService.delete(`/favorites/${propertyId}`);
+        set({ favorites: get().favorites.filter(fav => fav.id !== propertyId) });
+        toast.success('Removed from favorites');
+      } else {
+        const response = await apiService.post<Property>(`/favorites/${propertyId}`, {});
+        set({ favorites: [...get().favorites, response] });
+        toast.success('Added to favorites');
+      }
     } catch (error) {
-      toast.error('Failed to update favorite');
+      toast.error('Failed to update favorites');
     }
   },
 
-  fetchFavorites: async () => {
+  searchProperties: async (query: string) => {
+    set({ isLoading: true });
     try {
-      const response = await apiService.get('/properties/user/favorites');
-      set({ favorites: response.data.data });
+      const response = await apiService.get<PaginatedResponse<Property>>(`/properties/search?q=${query}`);
+      set({ properties: response.data, isLoading: false });
     } catch (error) {
-      console.error('Failed to fetch favorites:', error);
+      set({ isLoading: false });
+      toast.error('Search failed');
     }
-  },
-
-  setFilters: (filters: Partial<PropertyFilters>) => {
-    set((state) => ({
-      filters: { ...state.filters, ...filters, page: 1 },
-    }));
-    get().fetchProperties();
-  },
-
-  clearFilters: () => {
-    set({
-      filters: {
-        page: 1,
-        limit: 12,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-      },
-    });
-    get().fetchProperties();
   },
 }));

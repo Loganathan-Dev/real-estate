@@ -1,30 +1,33 @@
-// frontend/src/store/authStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User } from '@/types';
 import { apiService } from '@/services/api';
 import toast from 'react-hot-toast';
+
+// Define types locally or import from @/types
+interface User {
+  id: string;
+  email: string;
+  name?: string;
+  role?: 'user' | 'admin';
+}
+
+interface LoginResponse {
+  user: User;
+  token: string;
+}
 
 interface AuthState {
   user: User | null;
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
   logout: () => void;
-  fetchUser: () => Promise<void>;
-}
-
-interface RegisterData {
-  email: string;
-  password: string;
-  name: string;
-  phone?: string;
+  register: (email: string, password: string, name?: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       token: null,
       isLoading: false,
@@ -32,52 +35,41 @@ export const useAuthStore = create<AuthState>()(
       login: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
-          const response = await apiService.post('/auth/login', { email, password });
-          const { user, token } = response.data;
+          // Add type assertion here
+          const response = await apiService.post<LoginResponse>('/auth/login', { email, password });
+          const { user, token } = response; // Note: response is the data directly, not response.data
           localStorage.setItem('token', token);
           set({ user, token, isLoading: false });
           toast.success('Logged in successfully!');
         } catch (error: any) {
           set({ isLoading: false });
-          toast.error(error.response?.data?.error || 'Login failed');
-          throw error;
-        }
-      },
-
-      register: async (data: RegisterData) => {
-        set({ isLoading: true });
-        try {
-          const response = await apiService.post('/auth/register', data);
-          const { user, token } = response.data;
-          localStorage.setItem('token', token);
-          set({ user, token, isLoading: false });
-          toast.success('Registered successfully!');
-        } catch (error: any) {
-          set({ isLoading: false });
-          toast.error(error.response?.data?.error || 'Registration failed');
-          throw error;
+          toast.error(error.message || 'Login failed');
         }
       },
 
       logout: () => {
         localStorage.removeItem('token');
         set({ user: null, token: null });
-        toast.success('Logged out successfully');
-        window.location.href = '/';
+        toast.success('Logged out successfully!');
       },
 
-      fetchUser: async () => {
+      register: async (email: string, password: string, name?: string) => {
+        set({ isLoading: true });
         try {
-          const response = await apiService.get('/auth/me');
-          set({ user: response.data });
-        } catch (error) {
-          console.error('Failed to fetch user:', error);
+          const response = await apiService.post<LoginResponse>('/auth/register', { email, password, name });
+          const { user, token } = response; // Note: response is the data directly
+          localStorage.setItem('token', token);
+          set({ user, token, isLoading: false });
+          toast.success('Registered successfully!');
+        } catch (error: any) {
+          set({ isLoading: false });
+          toast.error(error.message || 'Registration failed');
         }
       },
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ user: state.user, token: state.token }),
+      getStorage: () => localStorage,
     }
   )
 );

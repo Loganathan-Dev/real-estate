@@ -1,4 +1,3 @@
-// frontend/src/components/property/PropertyCard.tsx
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -84,7 +83,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property, variant = 
               </div>
               <div className="flex items-center text-gray-600">
                 <Square className="h-4 w-4 mr-1" />
-                <span className="text-sm">{property.area} sq.ft</span>
+                <span className="text-sm">{property.areaSqft || 0} sq.ft</span>
               </div>
             </div>
           </div>
@@ -110,9 +109,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property, variant = 
           />
           <div className="absolute top-2 right-2 z-10">
             <Button
-              size="sm"
-              variant="ghost"
-              className="bg-white/90 hover:bg-white"
+              className="bg-white/90 hover:bg-white !p-2 rounded-full"  // Added !p-2 for padding, rounded-full for circular
               onClick={handleFavorite}
             >
               <Heart
@@ -153,7 +150,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property, variant = 
             </div>
             <div className="flex items-center text-gray-600">
               <Square className="h-4 w-4 mr-1" />
-              <span className="text-sm">{property.area}</span>
+              <span className="text-sm">{property.areaSqft || 0}</span>
             </div>
           </div>
         </div>
