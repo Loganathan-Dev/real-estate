@@ -1,0 +1,23 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+
+# environment variables
+.env
+.env.local
+
+# build files
+dist
+build
+
+# logs
+npm-debug.log*
+
+# prisma
+.prisma
+
+# OS files
+.DS_Store
+Thumbs.db
